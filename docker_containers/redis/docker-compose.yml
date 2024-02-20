@@ -1,0 +1,26 @@
+version: '3.1'
+
+#- REDIS_HOST: указывает имя хоста или IP-адрес сервера Redis.
+#- REDIS_PORT: указывает номер порта сервера Redis.
+#- REDIS_PASSWORD: указывает пароль для аутентификации на сервере Redis.
+#- REDIS_REPLICATION_MODE: определяет режим репликации для сервера Redis. Возможные значения: «главный», «подчиненный» и «дозорный».
+#- REDIS_DB: указывает номер базы данных Redis, которую нужно использовать.
+#- REDIS_MAXMEMORY: указывает максимальный объем памяти, который может использовать сервер Redis.
+#- REDIS_MAXCLIENTS: указывает максимальное количество клиентов, которые может обрабатывать сервер Redis.
+#- REDIS_TIMEOUT: указывает значение тайм-аута для команд Redis.
+#- REDIS_APPENDONLY: указывает, следует ли включить режим только добавления для сервера Redis.
+#- REDIS_CONFIG_FILE: указывает путь к пользовательскому файлу конфигурации Redis.
+
+services:
+  redis:
+    container_name: redis
+    hostname: redis
+    image: "redis/redis-stack:7.2.0-v8"
+    restart: always
+    ports:
+      - "6380:6379"
+      - "8001:8001"
+    environment:
+      - REDIS_PORT=6379
+      - REDIS_DATABASES=16
+      - REDIS_AOF_ENABLED=no

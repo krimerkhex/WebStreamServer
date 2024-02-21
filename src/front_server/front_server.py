@@ -11,7 +11,29 @@ import io
 
 
 class FrontServer(FastAPI):
+    """
+    A class representing a front-end server for streaming video frames.
+     Attributes:
+        __templates (Jinja2Templates): Jinja2Templates instance for rendering templates.
+        __consumer (KafkaConsumer): Kafka consumer instance for receiving recognized frames.
+        __producer (KafkaProducer): Kafka producer instance for sending stream URLs.
+        __redis (Redis): Redis client instance for storing frame data.
+     Methods:
+        __init__(self, **fastapi_init): Initializes the FrontServer object with additional FastAPI parameters.
+        __enter__(self): Context manager entry method.
+        __exit__(self, exc_type, exc_val, exc_tb): Context manager exit method.
+        __hello_world(self, request: Request): Handles the 'GET /' endpoint to display the index.html template.
+        __produce_url(self, host: str, port: int, url: str): Produces a URL for streaming.
+        __get_video_frames(self): Generator function to retrieve video frames from Kafka and Redis.
+        __upload_stream(self, request: Request): Handles the 'GET /stream_video/' endpoint for streaming video frames.
+        __prepare_stream(self, request: Request, url: str): Prepares the stream for the specified URL.
+    """
+
     def __init__(self, **fastapi_init):
+        """Initializes the FrontServer object.
+         Args:
+            **fastapi_init: Additional initialization parameters for FastAPI.
+        """
         logger.info("Object FrontServer init starting")
         super().__init__(**fastapi_init)
         self.__templates = Jinja2Templates(directory="templates")
@@ -26,9 +48,11 @@ class FrontServer(FastAPI):
                            methods=["GET"])
 
     def __enter__(self):
+        """Context manager entry method."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit method."""
         self.__consumer.close()
         self.__producer.close()
         self.__redis.close()
@@ -36,14 +60,30 @@ class FrontServer(FastAPI):
         logger.info("Object FrontServer distracted")
 
     async def __hello_world(self, request: Request):
+        """Handles the 'GET /' endpoint to display the index.html template.
+         Args:
+            request (Request): The incoming request object.
+         Returns:
+            TemplateResponse: The response containing the rendered index.html template.
+        """
         return self.__templates.TemplateResponse("index.html", {'request': request})
 
     def __produce_url(self, host: str, port: int, url: str):
+        """Produces a URL for streaming.
+         Args:
+            host (str): The host of the URL.
+            port (int): The port of the URL.
+            url (str): The URL to be produced for streaming.
+        """
         client = f"{host}:{port}".encode()
         url = url.replace("+", "/").encode()
         self.__producer.send("stream_urls", key=client, value=url)
 
     async def __get_video_frames(self):
+        """Generator function to retrieve video frames from Kafka and Redis.
+         Yields:
+            bytes: Image frames in JPEG format.
+        """
         flag = True
         logger.info("Class started checking Kafka")
         while flag:
@@ -67,9 +107,22 @@ class FrontServer(FastAPI):
                 flag = False
 
     def __upload_stream(self, request: Request):
+        """Handles the 'GET /stream_video/' endpoint for streaming video frames.
+         Args:
+            request (Request): The incoming request object.
+         Returns:
+            StreamingResponse: The streaming response with video frames.
+        """
         return StreamingResponse(self.__get_video_frames(), media_type='multipart/x-mixed-replace; boundary=frame')
 
     async def __prepare_stream(self, request: Request, url: str):
+        """Prepares the stream for the specified URL.
+         Args:
+            request (Request): The incoming request object.
+            url (str): The URL for streaming.
+         Returns:
+            TemplateResponse: The response containing the rendered stream.html template.
+        """
         if len(request.query_params) != 0:
             url = url + "?" + str(request.query_params)
         self.__produce_url(request.client.host, request.client.port, url)
@@ -77,6 +130,7 @@ class FrontServer(FastAPI):
 
 
 def start_front_server():
+    """Starts the front-end server for streaming video frames."""
     try:
         with FrontServer(title="We're streaming slowly...") as server:
             run(server, host="127.0.0.1", port=8888, log_level="info")

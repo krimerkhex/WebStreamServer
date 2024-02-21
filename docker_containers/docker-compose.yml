@@ -1,0 +1,93 @@
+version: '3.1'
+
+services:
+  #- ZOOKEEPER_CLIENT_PORT: порт, который сервер ZooKeeper будет прослушивать для клиентских подключений.
+  #- ZOOKEEPER_TICK_TIME: длина тика ZooKeeper в миллисекундах.
+  #- ZOOKEEPER_INIT_LIMIT: максимальное количество тактов, в течение которых сервер ZooKeeper будет ждать доступности кворума серверов перед запуском.
+  #- ZOOKEEPER_SYNC_LIMIT: максимальное количество тиков, в течение которых сервер ZooKeeper будет ждать, пока кворум серверов подтвердит запись, прежде чем зафиксировать ее в журнале.
+  #- ZOOKEEPER_MAX_CLIENT_CNXNS: максимальное количество клиентских подключений, которое разрешит сервер ZooKeeper.
+  #- ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL: интервал, с которым сервер ZooKeeper будет удалять старые данные из журнала.
+  #- ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT: количество снимков, которые сохранит сервер ZooKeeper.
+  #- ZOOKEEPER_4LW_COMMANDS_WHITELIST: список разделенных запятыми команд ZooKeeper, которые разрешено выполнять в режиме 4LW.
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.2.1
+    hostname: zookeeper
+    container_name: zookeeper
+    restart: always
+    ports:
+      - "2181:21811"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+
+
+#- KAFKA_ADVERTISED_HOST_NAME: имя хоста или IP-адрес, который брокер Kafka будет рекламировать другим брокерам и клиентам.
+#- KAFKA_BROKER_ID: уникальный идентификатор брокера Kafka.
+#- KAFKA_ZOOKEEPER_CONNECT: строка подключения к ансамблю ZooKeeper.
+#- KAFKA_ADVERTISED_LISTENERS: разделенный запятыми список слушателей, которых брокер Kafka будет рекламировать другим брокерам и клиентам.
+#- KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: разделенный запятыми список имен прослушивателей и соответствующих им протоколов безопасности.
+#- KAFKA_INTER_BROKER_LISTENER_NAME: имя прослушивателя, который будет использоваться для связи между брокерами.
+#- KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: коэффициент репликации для темы смещений.
+#- KAFKA_MESSAGE_MAX_BYTES: максимальный размер сообщения в байтах.
+#- KAFKA_LOG_RETENTION_MS: время, в течение которого сообщения будут храниться в журнале.
+
+  kafka:
+    image: confluentinc/cp-kafka:7.2.1
+    hostname: kafka
+    container_name: kafka
+    restart: always
+    depends_on:
+      - "zookeeper"
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_MESSAGE_MAX_BYTES: 131072
+      KAFKA_LOG_RETENTION_MS: 5000
+      KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
+
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8082:8080
+    restart: always
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    links:
+      - kafka
+      - zookeeper
+
+#- REDIS_HOST: указывает имя хоста или IP-адрес сервера Redis.
+#- REDIS_PORT: указывает номер порта сервера Redis.
+#- REDIS_PASSWORD: указывает пароль для аутентификации на сервере Redis.
+#- REDIS_REPLICATION_MODE: определяет режим репликации для сервера Redis. Возможные значения: «главный», «подчиненный» и «дозорный».
+#- REDIS_DB: указывает номер базы данных Redis, которую нужно использовать.
+#- REDIS_MAXMEMORY: указывает максимальный объем памяти, который может использовать сервер Redis.
+#- REDIS_MAXCLIENTS: указывает максимальное количество клиентов, которые может обрабатывать сервер Redis.
+#- REDIS_TIMEOUT: указывает значение тайм-аута для команд Redis.
+#- REDIS_APPENDONLY: указывает, следует ли включить режим только добавления для сервера Redis.
+#- REDIS_CONFIG_FILE: указывает путь к пользовательскому файлу конфигурации Redis.
+
+  redis:
+    container_name: redis
+    hostname: redis
+    image: "redis/redis-stack:7.2.0-v8"
+    restart: always
+    ports:
+      - "6380:6379"
+      - "8001:8001"
+    environment:
+      - REDIS_PORT=6379
+      - REDIS_DATABASES=16
+      - REDIS_AOF_ENABLED=no
+

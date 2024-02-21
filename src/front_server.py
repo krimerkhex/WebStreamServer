@@ -12,12 +12,6 @@ import msgpack_numpy as magic
 import io
 
 
-# yield image_bytes
-# http://localhost:8888/streaming/http:++211.132.61.124+mjpg+video.mjpg/
-# http://localhost:8888/streaming/http:++77.73.54.134:88+webcapture.jpg?command=snap&channel=8?0.3060441690920612/
-# http://localhost:8888/streaming/http:++24.227.79.246+cgi-bin+viewer+video.jpg?r=1707923972
-# http://77.73.54.134:88/webcapture.jpg?command=snap&channel=8?0.3060441690920612/
-
 class FrontServer(FastAPI):
     def __init__(self, **fastapi_init):
         logger.info("Object FrontServer init starting")
@@ -45,13 +39,11 @@ class FrontServer(FastAPI):
     async def __hello_world(self, request: Request):
         return self.__templates.TemplateResponse("index.html", {'request': request})
 
-    @Loger
     def __produce_url(self, host: str, port: int, url: str):
         client = f"{host}:{port}".encode()
         url = url.replace("+", "/").encode()
         self.__producer.send("stream_urls", key=client, value=url)
 
-    @Loger
     async def __get_video_frames(self):
         flag = True
         logger.info("Class started checking Kafka")
@@ -69,19 +61,17 @@ class FrontServer(FastAPI):
                                 with io.BytesIO() as output:
                                     image.save(output, format='JPEG')
                                     image_bytes = output.getvalue()
-                                logger.info("Server sended frame")
-                                yield image_bytes
+                                yield (b'--frame\r\n'
+                                       b'Content-Type: image/jpeg\r\n\r\n' + image_bytes + b'\r\n')
             except Exception as ex:
                 logger.exception(
                     f"\n[CLASS] FrontServer\n[FUNC] __start_streaming\n[DESCRIPTION] Something wrong\n{ex}")
                 flag = False
 
-    @Loger
     def __upload_stream(self, request: Request):
-        return StreamingResponse(self.__get_video_frames(), status_code=200)
+        return StreamingResponse(self.__get_video_frames(), media_type='multipart/x-mixed-replace; boundary=frame')
 
     async def __prepare_stream(self, request: Request, url: str):
-        print(request.client, request.url)
         if len(request.query_params) != 0:
             url = url + "?" + str(request.query_params)
         self.__produce_url(request.client.host, request.client.port, url)

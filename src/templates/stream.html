@@ -2,28 +2,6 @@
 
 {% block body %}
 <div class="stream_field">
-     <img id="videoFrame" width="1280" height="1020" src="/stream_video/" />
+    <img id="videoFrame" width="1280" height="1020" src="/stream_video/"/>
 </div>
-<script>
-    // const videoFrame = document.getElementById('videoFrame');
-    //
-    // // Функция для обновления видеокадров на странице
-    // async function updateVideoFrames() {
-    //     const response = await fetch('/stream_video/');
-    //     const reader = response.body.getReader();
-    //
-    //     setInterval(async function () {
-    //         const {done, value} = await reader.read();
-    //         if (!done) {
-    //             const blob = new Blob([value], {type: 'image/jpeg'});
-    //             const url = URL.createObjectURL(blob);
-    //             videoFrame.src = url;
-    //         }
-    //     }, 1000);
-    // }
-    //
-    // // Вызов функции для обновления кадров на странице
-    // updateVideoFrames();
-
-</script>
 {% endblock %}

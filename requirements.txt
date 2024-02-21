@@ -1,0 +1,13 @@
+fastapi[all]
+uvicorn==0.27.0post1
+argparse==1.4.0
+loguru==0.7.2
+requests==2.31.0
+bs4==0.0.2
+redis==5.0.1
+opencv-python==4.7.0.72
+kafka-python==2.0.2
+pyspark==3.5.0
+yolov5==7.0.13
+msgpack_numpy==0.4.8
+msgpack==1.0.7

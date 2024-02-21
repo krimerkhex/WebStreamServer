@@ -2,7 +2,6 @@ import os
 import sys
 from docker_containers.apache_kafka import make_kafka as kafka
 from docker_containers.redis import make_redis as redis
-from src.front_server import start_server
 
 
 def check_platform():
@@ -37,7 +36,6 @@ def make():
     kafka.run_docker()
     # spark.run_docker()
     redis.run_docker()
-    start_server()
 
 
 def main():

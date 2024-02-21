@@ -6,73 +6,30 @@ from logger import Loger, logger
 import yolov5
 import asyncio
 from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, StringType
 import msgpack_numpy as magic
-
-
-def get_spark_session():
-    spark = SparkSession.Builder \
-        .appName("YoloSession") \
-        .config("spark.some.config.option", "") \
-        .getOrCreate()
-    return spark
-
-
-def get_stream_from_kafka(spark):
-    kafka_topic_stream = spark.readStream.formet("kafka") \
-        .option("kafka.bootstrap.servers", "localhost:9092") \
-        .option("subscribe", "parsed_frames") \
-        .option("startingOffsets", "latest") \
-        .load()
-    return kafka_topic_stream
 
 
 class BackServer(object):
     @Loger
     def __init__(self):
-        logger.info("Object BackServer init starting")
         self.__consumer: kafka.KafkaConsumer = get_kafka_consumer("parsed_frames")
         self.__producer: kafka.KafkaProducer = get_kafka_producer()
+        self.__spark = self.__get_spark_session()
+        self.__spark_stream = self.__get_stream_from_kafka()
         self.__redis: redis.Redis = get_session_redis()
         self.__model = yolov5.load('yolov5s.pt')
 
-    @Loger
     def __enter__(self):
         return self
 
-    @Loger
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.__consumer.close()
         self.__producer.close()
         self.__redis.close()
+        self.__spark.stop()
         self.__consumer, self.__producer, self.__redis, self.__frame_id = None, None, None, None
         logger.info("Object BackServer distracted")
-
-    @Loger
-    async def infinity_run(self):
-        logger.info("Class started checking Kafka")
-        while True:
-            for url, link in self.__get_message():
-                if link is not None and url is not None:
-                    logger.info("Server got message from kafka")
-                    frame = magic.unpackb(self.__redis.get(link))
-                    if frame is not None:
-                        print(frame, link, url, sep="\n")
-                        await self.__picture_recognition(url, link, frame)
-                    else:
-                        print("No value on redis by link: ", link, " and url: ", url)
-
-    async def __picture_recognition(self, url, link, frame):
-        print("In __picture_recognition")
-        frame = self.__model(frame).render()[0]
-        self.__send_message(url, link, frame)
-
-    def __get_message(self):
-        message = self.__consumer.poll(timeout_ms=1.0)
-        if len(message.keys()) == 0:
-            yield None, None
-        for key in message:
-            for record in message[key]:
-                yield record.key.decode("utf-8"), record.value.decode("utf-8")
 
     def __send_message(self, url, link, frame):
         link = link.encode()
@@ -80,8 +37,59 @@ class BackServer(object):
         self.__producer.send("recognized_frames", key=url.encode(), value=link)
         logger.info("Back sended message to karfka and redis")
 
+    def __get_spark_session(self):
+        try:
+            spark = SparkSession.builder \
+                .appName("ParserSession") \
+                .master("local[*]") \
+                .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0') \
+                .getOrCreate()
+            spark.sparkContext.setLogLevel("ERROR")
+        except Exception as ex:
+            logger.error(f"Spark connection don't created\n.Exception:\n{ex}")
+        return spark
 
-@Loger
+    def __get_stream_from_kafka(self):
+        try:
+            kafka_topic_stream = self.__spark.readStream \
+                .format("kafka") \
+                .option("kafka.bootstrap.servers", "localhost:9092") \
+                .option("subscribe", "parsed_frames") \
+                .option("startingOffsets", "latest") \
+                .load()
+        except Exception as ex:
+            logger.error(f"Kafka stream doesn't open\n.Exeption:\n{ex}")
+        return kafka_topic_stream
+
+    def __get_df_from_kafka_stream(self):
+        schema = StructType(
+            [
+                StructField("url", StringType()),
+                StructField("frame_id", StringType())
+            ]
+        )
+
+        queue = self.__spark_stream.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+        return queue
+
+    def __picture_recognition(self, url, link, frame):
+        frame = self.__model(frame).render()[0]
+        self.__send_message(url, link, frame)
+
+    def __get_frame(self, batch_df, batch_id):
+        data_collect = batch_df.collect()
+        for data_row in data_collect:
+            frame_id = data_row["value"]
+            print(data_row["key"], frame_id)
+            self.__picture_recognition(data_row["key"], frame_id, magic.unpackb(self.__redis.get(frame_id)))
+
+    async def infinity_run(self):
+        logger.info("Class started checking Kafka")
+        query = self.__get_df_from_kafka_stream().writeStream.foreachBatch(self.__get_frame).outputMode(
+            "append").start()
+        query.awaitTermination()
+
+
 def start_back_server():
     with BackServer() as back:
         asyncio.run(back.infinity_run())

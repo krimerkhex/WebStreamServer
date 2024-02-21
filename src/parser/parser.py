@@ -41,6 +41,7 @@ class Parser(object):
                 cap = cv.VideoCapture(url)
                 for ret, frame in self.__get_image(cap):
                     if ret:
+                        frame = cv.resize(frame, (1024, 1024))
                         self.__send_message(frame, url)
                         self.__frame_id += 1
                 cap.release()
@@ -57,9 +58,10 @@ class Parser(object):
             yield None, None
 
     def __send_message(self, frame, url):
-        link = str(self.__frame_id).encode()
-        self.__redis.set(link, magic.packb(frame))
-        self.__producer.send("parsed_frames", key=url.encode(), value=link)
+        frame_id = str(self.__frame_id).encode()
+        self.__redis.set(frame_id, magic.packb(frame))
+        self.__redis.expire(frame_id, 5)
+        self.__producer.send("parsed_frames", key=url.encode(), value=frame_id)
 
     def __get_message(self):
         message = self.__consumer.poll(timeout_ms=1.0)
@@ -72,6 +74,7 @@ class Parser(object):
 
 def start_parser_server():
     try:
+        logger.info(f"File: parser.py started")
         with Parser() as parser:
             asyncio.run(parser.infinity_run())
     except KeyboardInterrupt:

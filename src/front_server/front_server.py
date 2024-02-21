@@ -55,7 +55,6 @@ class FrontServer(FastAPI):
                             url, value = record.key.decode("utf-8"), record.value.decode("utf-8")
                             frame = self.__redis.get(value)
                             if frame is not None:
-                                self.__redis.delete(value)
                                 image = Image.fromarray(magic.unpackb(frame))
                                 with io.BytesIO() as output:
                                     image.save(output, format='JPEG')

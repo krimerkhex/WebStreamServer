@@ -96,3 +96,5 @@ def start_parser_server():
 
 if __name__ == "__main__":
     start_parser_server()
+else:
+    logger.error("The parser.py module cannot be run by module")

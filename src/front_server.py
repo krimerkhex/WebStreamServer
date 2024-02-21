@@ -88,3 +88,5 @@ def start_front_server():
 
 if __name__ == "__main__":
     start_front_server()
+else:
+    logger.error("The front_server.py module cannot be run by module")

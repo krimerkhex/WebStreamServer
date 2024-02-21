@@ -11,7 +11,6 @@ import msgpack_numpy as magic
 
 
 class BackServer(object):
-    @Loger
     def __init__(self):
         self.__consumer: kafka.KafkaConsumer = get_kafka_consumer("parsed_frames")
         self.__producer: kafka.KafkaProducer = get_kafka_producer()
@@ -31,10 +30,10 @@ class BackServer(object):
         self.__consumer, self.__producer, self.__redis, self.__frame_id = None, None, None, None
         logger.info("Object BackServer distracted")
 
-    def __send_message(self, url, link, frame):
-        link = link.encode()
-        self.__redis.set(link, magic.packb(frame))
-        self.__producer.send("recognized_frames", key=url.encode(), value=link)
+    def __send_message(self, url, frame_id, frame):
+        frame_id = frame_id.encode()
+        self.__redis.set(frame_id, magic.packb(frame))
+        self.__producer.send("recognized_frames", key=url.encode(), value=frame_id)
         logger.info("Back sended message to karfka and redis")
 
     def __get_spark_session(self):
@@ -72,9 +71,9 @@ class BackServer(object):
         queue = self.__spark_stream.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
         return queue
 
-    def __picture_recognition(self, url, link, frame):
+    def __picture_recognition(self, url, frame_id, frame):
         frame = self.__model(frame).render()[0]
-        self.__send_message(url, link, frame)
+        self.__send_message(url, frame_id, frame)
 
     def __get_frame(self, batch_df, batch_id):
         data_collect = batch_df.collect()
@@ -90,9 +89,14 @@ class BackServer(object):
 
 
 def start_back_server():
-    with BackServer() as back:
-        asyncio.run(back.infinity_run())
+    try:
+        with BackServer() as back:
+            asyncio.run(back.infinity_run())
+    except KeyboardInterrupt:
+        logger.warning("Back-end stoped working")
 
 
 if __name__ == "__main__":
     start_back_server()
+else:
+    logger.error("The back_server.py module cannot be run by module")

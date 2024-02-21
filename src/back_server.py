@@ -80,7 +80,6 @@ class BackServer(object):
         data_collect = batch_df.collect()
         for data_row in data_collect:
             frame_id = data_row["value"]
-            print(data_row["key"], frame_id)
             self.__picture_recognition(data_row["key"], frame_id, magic.unpackb(self.__redis.get(frame_id)))
 
     async def infinity_run(self):

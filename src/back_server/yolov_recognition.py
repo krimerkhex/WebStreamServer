@@ -4,7 +4,7 @@ from loguru import logger
 import yolov5
 from pyspark.sql import SparkSession
 import msgpack_numpy as magic
-from logger import Loger
+from time import time_ns
 
 
 class BackServer(object):
@@ -197,7 +197,12 @@ class BackServer(object):
         data_collect = batch_df.collect()
         for data_row in data_collect:
             frame_id = data_row["value"]
-            self.__picture_recognition(data_row["key"], frame_id, magic.unpackb(self.__redis.get(frame_id)))
+            frame = self.__redis.get(frame_id)
+            if frame is not None:
+                logger.info(f"Got message from by id: {frame_id}")
+                self.__picture_recognition(data_row["key"], frame_id, magic.unpackb(frame))
+            else:
+                logger.warning(f"Not key in Redis: {frame_id}. Back got NoneType error.")
 
     def infinity_run(self):
         """
@@ -210,9 +215,12 @@ class BackServer(object):
             None
         """
         logger.info("Class started checking Kafka")
-        query = self.__get_df_from_kafka_stream().writeStream.foreachBatch(self.__get_frame).outputMode(
-            "append").start()
-        query.awaitTermination()
+        try:
+            query = self.__get_df_from_kafka_stream().writeStream.foreachBatch(self.__get_frame).outputMode(
+                "append").start()
+            query.awaitTermination()
+        except Exception as ex:
+            logger.exception(ex)
 
 
 def start_back_server():
@@ -220,12 +228,13 @@ def start_back_server():
     Starts the backend server for processing Kafka stream data.
 
     This function initiates the BackServer, enters the context manager, starts the streaming process, and handles exceptions.
-    It logs the start of the 'back_server.py' file and provides a warning message upon unexpected interruption by the user.
+    It logs the start of the 'yolov_recognition.py' file and provides a warning message upon unexpected interruption by the user.
 
     Returns:
         None
     """
-    logger.info(f"File: back_server.py started")
+    logger.add(f"logs/yolov_recognition_{time_ns()}.log")
+    logger.info("File: yolov_recognition.py started")
     try:
         with BackServer() as back:
             back.infinity_run()
@@ -236,4 +245,4 @@ def start_back_server():
 if __name__ == "__main__":
     start_back_server()
 else:
-    logger.error("The back_server.py module cannot be run by module")
+    logger.error("The yolov_recognition.py module cannot be run by module")

@@ -8,6 +8,8 @@ import redis
 from PIL import Image
 import msgpack_numpy as magic
 import io
+from time import time_ns
+from configure_kafka import init_kafka_topics
 
 
 class FrontServer(FastAPI):
@@ -129,9 +131,20 @@ class FrontServer(FastAPI):
         return self.__templates.TemplateResponse("stream.html", {'request': request})
 
 
+def init_kafka():
+    try:
+        logger.info("Init topics in process.")
+        # delete_topics()
+        init_kafka_topics()
+    except Exception as ex:
+        logger.exception(ex)
+
+
 def start_front_server():
     """Starts the front-end server for streaming video frames."""
     try:
+        logger.add(f"logs/front_server_{time_ns()}.log")
+        init_kafka()
         with FrontServer(title="We're streaming slowly...") as server:
             run(server, host="127.0.0.1", port=8888, log_level="info")
     except KeyboardInterrupt:

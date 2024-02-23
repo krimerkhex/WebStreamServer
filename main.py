@@ -1,14 +1,9 @@
 import os
 import subprocess
 import sys
-import time
-
-from docker_containers.configure_dockers import init_kafka_topics, delete_topics
-from loguru import logger
+from time import time_ns, sleep
+import logging
 from subprocess import Popen
-
-delimeter = "/"
-files = ("src/back_server/back_server.py", "src/parser/parser.py", "src/front_server/front_server.py")
 
 
 def check_platform():
@@ -20,52 +15,68 @@ def check_python_version():
 
 
 def run_all_file():
-    for file in files:
-        Popen(args=["start", "python", file], shell=True, stdout=subprocess.PIPE)
+    try:
+        files = (
+            "src/front_server/front_server.py", "src/parser/frame_parser.py", ""
+                                                                              "src/back_server/yolov_recognition.py" )
+        # files = (
+        #     "src/parser/frame_parser.py", "src/front_server/front_server.py")
+
+        for file in files:
+            Popen(args=["start", "python", file], shell=True, stdout=subprocess.PIPE)
+        logging.info("The files started working in their terminals.")
+        return True
+    except Exception as ex:
+        logging.exception(ex)
+        return False
 
 
 def install_requirements():
+    logging.info("Install requirements started.")
+    flag = True
     if os.system("pip install -r requirements.txt") == 0:
-        logger.info("Python modules installed. Trying to start project")
+        logging.info("Python modules installed. Trying to start project.")
     else:
-        logger.info("Error on installing python modules.")
-
-
-def init_kafka():
-    try:
-        # delete_topics()
-        init_kafka_topics()
-    except Exception as ex:
-        logger.exception(ex)
+        flag = False
+        logging.info("Error on installing python modules.")
+    return flag
 
 
 def run_docker():
-    os.system("docker compose -f docker_containers/docker-compose.yml up -d")
-
-
-def stop_socker():
-    os.system("docker compose -f docker_containers/docker-compose.yml down")
+    try:
+        logging.info("Building and running the entire application.")
+        flag = True
+        if os.system("docker compose -f docker_containers/docker-compose.yml up -d") != 0:
+            flag = False
+            logging.error("Error on docker container creation.")
+    except Exception as ex:
+        logging.exception(ex)
+        flag = False
+    return flag
 
 
 def make():
-    logger.info("Building and running the entire application.")
-    run_docker()
-
-    logger.info("Install requirements started")
-    install_requirements()
-
-    time.sleep(40)
-    logger.info("Init topics in process")
-    init_kafka()
-    logger.info("Topics created")
-    logger.info("Running python files. Wait please.")
-    run_all_file()
-    logger.info("Project ready to use. Web application start work by http://127.0.0.1:8888. Good luck!")
+    if run_docker():
+        if install_requirements():
+            logging.info("The docker container with kafka needs about 40 seconds to fully initialize.")
+            sleep(40)
+            logging.info("Running python files. Wait please.")
+            if run_all_file():
+                print(
+                    "Project ready to use. Web application start work by http://127.0.0.1:8888. Good luck!")
 
 
 def main():
-    if check_platform() and check_python_version():
-        make()
+    logging.basicConfig(filename=f'logs/build_{time_ns()}.log', level=logging.DEBUG,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
+    if check_platform():
+        if check_python_version():
+            make()
+        else:
+            logging.error(
+                f"This project must work on python 3.11. Current python version: {sys.version_info.major}.{sys.version_info.minor}")
+    else:
+        logging.error(f"This project must work on Windows or Linux. Current system is: {sys.platform}")
 
 
 if __name__ == "__main__":

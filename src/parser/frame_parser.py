@@ -4,6 +4,7 @@ from loguru import logger
 import asyncio
 import cv2 as cv
 import msgpack_numpy as magic
+from time import time_ns
 
 
 class Parser(object):
@@ -152,7 +153,6 @@ class Parser(object):
             ret, frame = cap.read()
             if ret:
                 yield ret, frame
-
             yield None, None
 
     def __send_message(self, frame, url):
@@ -173,6 +173,7 @@ class Parser(object):
         self.__redis.set(frame_id, magic.packb(frame))
         self.__redis.expire(frame_id, 5)
         self.__producer.send("parsed_frames", key=url.encode(), value=frame_id)
+        logger.info(f"One frame parsed from {url}. Frame_id: {self.__frame_id}.")
 
     def __get_message(self):
         """
@@ -198,7 +199,8 @@ def start_parser_server():
     Starts the parser server for processing video frames.
     """
     try:
-        logger.info(f"File: parser.py started")
+        logger.add(f"logs/frame_parser_{time_ns()}.log")
+        logger.info(f"File: frame_parser.py started")
         with Parser() as parser:
             asyncio.run(parser.infinity_run())
     except KeyboardInterrupt:
@@ -208,4 +210,4 @@ def start_parser_server():
 if __name__ == "__main__":
     start_parser_server()
 else:
-    logger.error("The parser.py module cannot be run by module")
+    logger.error("The frame_parser.py module cannot be run by module")

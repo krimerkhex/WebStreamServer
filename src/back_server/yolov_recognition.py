@@ -50,7 +50,7 @@ class BackServer(object):
         self.__spark = self.__get_spark_session()
         self.__spark_stream = self.__get_stream_from_kafka()
         self.__redis = redis.Redis(host="localhost", port=6380)
-        self.__model = yolov5.load('../yolov5s.pt')
+        self.__model = yolov5.load('yolov5s.pt')
 
     def __enter__(self):
         """
